@@ -1,0 +1,738 @@
+---
+title: "Applied predictive modeling"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+
+
+# Chapter 1. Introduction 
+
+```{r}
+# predictive modeling: the process of developing a mathematical tool or model that generates an accurate prediction 
+```
+
+## 1.1 Prediction versus interpretation
+```{r}
+# There is a trade-off between the prediction accuracy and causality interpretation 
+```
+
+## 1.2 Key ingredients of predictive models 
+```{r}
+# Intuition and deep knowledge of the problem context + relevant data + versatile computational toolbox 
+```
+
+## 1.3 Terminology 
+## 1.4 Example data sets and typical data scenarios 
+```{r}
+# Music genre
+# Grant applications 
+# Hepatic injury 
+# Permeability 
+# Chemical manufacturing process
+# Fraudulent financial statements 
+
+
+# Dimensions: Number of samples, number of predictors 
+# Response characteristics: Categorial or continious, balanced/symmetric, unbalanced/skewed, independent 
+# Predictor characteristics: continious, count, categorical, correlated/associated, different scales, missing values, sparse
+```
+
+## 1.5 Overview 
+## 1.6 Notation
+
+
+
+
+# Chapter 2. A short tour of predictive modeling process 
+
+## 2.1 Case study: predicting fuel economy 
+## 2.2 Themes
+```{r}
+# Data Spliting: extrapolatation and interpolatation 
+# Predictor data: feature selection 
+# Estimating performance: resampling and visualization 
+# Evaluating several models: No free lunch theorem 
+# Model selection: chose between models and selection within models (with different parameters) + cross-validation and test set 
+```
+## 2.3 summary 
+
+
+
+
+# Chapter 3. Data pre-processing 
+
+## 3.1 Case study: cell segmentation in high-content screening 
+## 3.2 Data transformation for individual predictors 
+
+### Centering and scaling 
+### Transformations to resolve skewness
+
+## 3.3 Data transformation for multiple predicors 
+
+### Transformations to resolve outliers 
+### Data reduction and feature extraction
+
+## 3.4 Dealing with missing values 
+
+### Imputation
+
+## 3.5 Removing predictors 
+
+### Zero variance predictor 
+### Between predictor correlations 
+
+## 3.6 Adding predictors 
+
+### dummy variables 
+### nonlinearality 
+
+## 3.7 Binning predictors 
+
+
+## 3.8 Computing 
+```{r}
+library(AppliedPredictiveModeling)
+library(caret)
+library(corrplot)
+library(e1071)
+library(lattice)
+library(caret)
+```
+
+```{r}
+apropos("confusion")
+```
+
+```{r}
+RSiteSearch("confusion",restrict='function')
+```
+```{r}
+data(segmentationOriginal)
+segData <- subset(segmentationOriginal, Case=="Train")
+```
+
+```{r}
+cellID <- segData$Cell
+class <- segData$Class
+case <- segData$Case
+segData <- segData[,-(1:3)]
+```
+
+```{r}
+statusColNum <- grep("Status",names(segData))
+statusColNum
+segData <- segData[,-statusColNum]
+```
+
+### Transformation 
+```{r}
+skewness(segData$AngleCh1)
+```
+```{r}
+skewValues <- apply(segData, 2, skewness)
+head(skewValues)
+```
+
+```{r}
+Ch1AreaTrans <- BoxCoxTrans(segData$AreaCh1)
+Ch1AreaTrans
+```
+
+```{r}
+# The original data
+head(segData$AreaCh1)
+```
+```{r}
+# After transformation 
+predict(Ch1AreaTrans, head(segData$AreaCh1))
+```
+
+```{r}
+(819^(-0.9)-1)/(-0.9)
+```
+
+```{r}
+pcaObject <- prcomp(segData, center=TRUE, scale. = TRUE)
+
+# Calculate the cumulative percentage of variance which each component accounts for 
+percentVariance <- pcaObject$sd^2/sum(pcaObject$sd^2)*100
+percentVariance[1:3]
+plot(percentVariance)
+```
+```{r}
+# The transformed values are stored in pcaObject as a sub-object called x
+head(pcaObject$x[,1:5])
+```
+
+```{r}
+head(pcaObject$rotation[,1:3])
+```
+
+```{r}
+SS <- spatialSign(segData)
+plot(SS)
+```
+
+```{r}
+trans <- preProcess(segData, method=c("BoxCox","center","scale","pca"))
+trans
+```
+
+```{r}
+# Apply the transformations
+transformed <- predict(trans, segData)
+# These values are different than the previous PCA components since they were transformed prior to PCA
+head(transformed[,1:5])
+```
+
+```{r}
+# The order in which the possible transformation are applied is transformation, centering, scaling, imputation, feature extraction, and then spatial sign.
+```
+
+### Filtering 
+
+```{r}
+nearZeroVar(segData)
+```
+
+```{r}
+correlations <- cor(segData)
+dim(correlations)
+correlations[1:4,1:4]
+```
+
+```{r,fig.height=9,fig.width=9}
+library(corrplot)
+corrplot(correlations, order="hclust")
+```
+
+```{r}
+highCorr <- findCorrelation(correlations, cutoff=.75)
+length(highCorr)
+head(highCorr)
+filteredSegData <- segData[,-highCorr]
+```
+
+
+### Creating dummy variables 
+```{r}
+head(carSubset)
+levels(carSubset$Type)
+simpleMod <- dummyVars(~Mileage+Type, data=carSubset, levelsOnly=TRUE)
+simpleMod
+
+predict(simpleMod,head(carSubset))
+
+withInteraction <- dummyVars(~Mileage + Type + Mileage:Type, data=carSubset, levelsOnly=TRUE)
+withInteraction
+
+predict(withInteraction, head(carSubset))
+
+```
+
+
+
+
+
+
+
+
+# Chapter 4. Over-Fitting and Model Tuning 
+
+## 4.1 The problem of over-fitting 
+
+## 4.2 Model tuning 
+
+## 4.3 Data splitting 
+
+```{r}
+# Pre-processing the predictor data 
+# Estimating model parameters 
+# Selecting predictors for the model
+# Evaluating model performance 
+# Fine tuning class prediction rules (via ROC curves)
+```
+
+## 4.4 Resampling techniques 
+```{r}
+# K-fold cross-validation
+# Generalized cross-validation
+# Repeated training/test splits 
+# The bootstrap
+```
+
+## 4.5 Case study: credit scoring
+
+## 4.6 Choosing final tuning parameters 
+
+## 4.7 Data splitting recommendations 
+```{r}
+# simple 10-fold cross-validation should provide acceptable variance, low bias, and is relatively quick to compute
+```
+
+## 4.8 Choosing between models 
+```{r}
+# 1. Start with several models that are the least interpretable and most flexible, such as boosted trees or support vector machines. Across many problem domains, these models have a high likelihood of producing the empirically optimum results 
+# 2. Investigate simpler models that are less opaque(not complete black boxes), such as multivariate adaptive regression splines (MARS), partial least squares, generalized addictive models, or naive bayes models.
+# 3. Consider using the simplest model that reasonably approximates the performance of the more complex methods
+```
+
+## 4.9 Computing 
+
+```{r}
+library(AppliedPredictiveModeling)
+library(caret)
+# library(Design)
+library(e1071)
+library(ipred)
+library(MASS)
+```
+
+### Data Spitting 
+
+```{r}
+data(twoClassData)
+```
+
+```{r}
+str(predictors)
+```
+
+```{r}
+str(classes)
+```
+
+```{r}
+set.seed(1)
+trainingRows <- createDataPartition(classes, p=.80, list = FALSE)
+head(trainingRows)
+```
+
+```{r}
+trainPredictors <- predictors[trainingRows,]
+trainClasses <- classes[trainingRows]
+testPredictors <- predictors[-trainingRows,]
+testClasses <- classes[-trainingRows]
+```
+
+```{r}
+str(trainPredictors)
+str(testPredictors)
+```
+
+
+### Resampling 
+```{r}
+set.seed(1)
+repeatedSplits <- createDataPartition(trainClasses, p=.80,times=3)
+str(repeatedSplits)
+```
+
+```{r}
+set.seed(1)
+cvSplits <- createFolds(trainClasses, k=10, returnTrain = TRUE)
+str(cvSplits)
+```
+
+```{r}
+fold1 <- cvSplits[[1]]
+fold1
+```
+
+```{r}
+cvPredictors1 <- trainPredictors[fold1,]
+cvClasses1 <- trainClasses[fold1]
+nrow(trainPredictors)
+nrow(cvPredictors1)
+```
+
+
+### Basic Model Building in R 
+```{r}
+# the formula interface
+modelFunction(price ~ numBedrooms + numBaths + acres, data = housingData)
+
+# the non-formula interface 
+modelFunction(x = housePredictors, y = price)
+```
+
+```{r}
+# knn3 
+trainPredictors <- as.matrix(trainPredictors)
+knnFit <- knn3(x = trainPredictors, y = trainClasses, k=5)
+knnFit
+```
+
+```{r}
+testPredictions <- predict(knnFit, newdata = testPredictors, type = "class")
+head(testPredictions)
+str(testPredictions)
+```
+
+
+### Determination of tuning parameters
+```{r}
+library(caret)
+data(GermanCredit)
+```
+
+```{r}
+# Data splitting
+GermanCredit <- GermanCredit[, -nearZeroVar(GermanCredit)]
+GermanCredit$CheckingAccountStatus.lt.0 <- NULL
+GermanCredit$SavingsAccountBonds.lt.100 <- NULL
+GermanCredit$EmploymentDuration.lt.1 <- NULL
+GermanCredit$EmploymentDuration.Unemployed <- NULL
+GermanCredit$Personal.Male.Married.Widowed <- NULL
+GermanCredit$Property.Unknown <- NULL
+GermanCredit$Housing.ForFree <- NULL
+
+set.seed(100)
+inTrain <- createDataPartition(GermanCredit$Class, p = .8)[[1]]
+GermanCreditTrain <- GermanCredit[ inTrain, ]
+GermanCreditTest  <- GermanCredit[-inTrain, ]
+```
+
+```{r}
+set.seed(1056)
+svmFit <- train(Class ~ .,
+                data = GermanCreditTrain,
+                method = "svmRadial")
+```
+
+```{r}
+set.seed(1056)
+svmFit <- train(Class ~ .,
+                data = GermanCreditTrain, 
+                method = "svmRadial",
+                preProc = c('center','scale'))
+```
+
+```{r}
+set.seed(1056)
+svmFit <- train(Class ~ ., 
+                data = GermanCreditTrain,
+                method = "svmRadial",
+                preProc = c('center','scale'),
+                tuneLength = 10)
+```
+
+```{r}
+set.seed(1056)
+svmFit <- train(Class ~ ., 
+                data = GermanCreditTrain,
+                method = 'svmRadial',
+                preProc = c('center','scale'),
+                tuneLength = 10,
+                trControl = trainControl(method = 'repeatedcv',repeats = 5))
+```
+
+```{r}
+svmFit
+```
+
+```{r}
+plot(svmFit)
+```
+
+```{r}
+plot(svmFit, scales = list(x=list(log = 2)))
+```
+
+```{r}
+predictedClasses <- predict(svmFit, GermanCreditTest)
+str(predictedClasses)
+```
+
+```{r}
+predictedProbs <- predict(svmFit, newdata = GermanCreditTest, type = "prob")
+head(predictedProbs)
+```
+
+
+### Between model comparisons 
+```{r}
+set.seed(1056)
+logisticReg <- train(Class ~ ., 
+                     data = GermanCreditTrain,
+                     method = "glm",
+                     trControl = trainControl(method = "repeatedcv", repeats = 5))
+logisticReg
+```
+
+```{r}
+resamp <- resamples(list(SVM = svmFit, Logistic = logisticReg))
+summary(resamp)
+```
+
+```{r}
+modelDifferences <- diff(resamp)
+summary(modelDifferences)
+```
+
+
+
+
+# Chapter 5. Measuring performance in regression models 
+
+
+## 5.1  Quantitative measures of performance
+```{r}
+# RMSE - Root Mean Squared Error: How far on average the residuals are from zero or as the average distance between the observed values and the model predictions
+
+# R2: Proportion of the information in the data that is explained by the model
+```
+
+## 5.2 The variance-bias trade-off
+```{r}
+# E[MSE] = irreducible noise + suqared bias + variance 
+```
+
+## 5.3 Computing 
+
+```{r}
+observed <- c(0.22, 0.83, -0.12, 0.89, -0.23, -1.30, -0.15, -1.4, 0.62, 0.99, -0.18, 0.32, 0.34, -0.30, 0.04, -0.87, 0.55, -1.30, -1.15, 0.20)
+predicted <- c(0.24, 0.78, -0.66, 0.53, 0.70, -0.75, -0.41, -0.43, 0.49, 0.79, -1.19, 0.06, 0.75, -0.07, 0.43, -0.42, -0.25, -0.64, -1.26, -0.07)
+residualValues <- observed - predicted 
+summary(residualValues)
+```
+
+```{r}
+axisRange <- extendrange(c(observed, predicted))
+plot(observed, predicted, ylim = axisRange, xlim = axisRange)
+abline(0, 1, col = "darkgrey", lty = 2)
+```
+
+```{r}
+plot(predicted, residualValues, ylab = "residual")
+abline(h = 0, col = "darkgrey", lty = 2)
+```
+
+```{r}
+caret::R2(predicted, observed)
+var(predicted, observed)
+caret::RMSE(predicted, observed)
+```
+
+```{r}
+cor(predicted, observed)
+cor(predicted, observed, method = "spearman")
+```
+
+
+
+
+
+# Chapter 6. Linear Regression and Its Cousins 
+```{r}
+# yi = b0 + b1xi1 + b2xi2 + ... + bpxip + ei
+# Linear in the parameters: ordinary linear regression, partial least squares (pls), penalized models (ridge regression, the lasso, the elastic net)
+```
+
+## 6.1 Case study: quantitative structure-activity relationship modeling
+
+## 6.2 Linear regression
+
+### Linear regression for solubility data
+
+## 6.3 Partial least squares 
+
+### PCR and PLSR for solubility data
+
+### Algorithmic variations of pls 
+
+## 6.4 Penalized models 
+
+## 6.5 Computing 
+
+```{r}
+library(AppliedPredictiveModeling)
+data(solubility)
+ls(pattern = "^solT")
+```
+
+```{r}
+set.seed(2)
+sample(names(solTrainX),8)
+```
+
+
+### Ordinary linear regression
+
+```{r}
+trainingData <- solTrainXtrans
+trainingData$Solubility <- solTrainY
+```
+
+```{r}
+lmFitAllPredictors <- lm(Solubility ~., data=trainingData)
+summary(lmFitAllPredictors)
+```
+
+```{r}
+lmPred1 <- predict(lmFitAllPredictors, solTestXtrans)
+head(lmPred1)
+```
+
+```{r}
+library(caret)
+lmValues1 <- data.frame(obs = solTestY, pred = lmPred1)
+defaultSummary(lmValues1)
+```
+
+```{r}
+library(MASS)
+rlmFitAllPredictors <- rlm(Solubility ~., data = trainingData)
+summary(rlmFitAllPredictors)
+```
+
+```{r}
+ctrl <- trainControl(method = "cv", number = 10)
+set.seed(100)
+lmFit1 <- train(x = solTrainXtrans, y = solTrainY, method = "lm", trControl = ctrl)
+lmFit1
+```
+
+```{r}
+xyplot(solTrainY ~predict(lmFit1), type = c("p","g"), xlab = "Predicdted", ylab = "Observed")
+```
+
+```{r}
+xyplot(resid(lmFit1) ~ predict(lmFit1), type = c("p","g"), xlab = "Predicted", ylab = "Residuals")
+```
+
+```{r}
+corThresh <- .9
+tooHigh <- findCorrelation(cor(solTrainXtrans),corThresh)
+corrPred <- names(solTrainXtrans)[tooHigh]
+trainXfiltered <- solTrainXtrans[,-tooHigh]
+testXfiltered <- solTestXtrans[,-tooHigh]
+set.seed(100)
+lmFiltered <- train(solTrainXtrans, solTrainY, method = "lm", trControl = ctrl)
+lmFiltered
+```
+
+```{r}
+set.seed(100)
+rlmPCA <- train(solTrainXtrans, solTrainY, method = "rlm", preProcess = "pca", trControl = ctrl)
+rlmPCA
+```
+
+
+### Partial least squares 
+
+```{r}
+library(pls)
+plsFit <- plsr(Solubility ~., data = trainingData)
+summary(plsFit)
+```
+
+```{r}
+predict(plsFit, solTestXtrans[1:5,], ncomp = 1:2)
+```
+
+```{r}
+set.seed(100)
+plsTune <- train(solTrainXtrans, solTrainY, method = "pls", tuneLength = 20, 
+                  # The default tuning grid evaluates components 1 ... tuneLength)
+                 trControl = ctrl, preProc = c("center","scale"))
+plsTune
+```
+
+```{r}
+plot(plsTune)
+```
+
+
+### Penalized regression models 
+
+```{r}
+library(elasticnet)
+ridgeModel <- enet(x = as.matrix(solTrainXtrans), y = solTrainY, lambda = 0.001)
+plot(ridgeModel)
+```
+```{r}
+ridgePred <- predict(ridgeModel, newx = as.matrix(solTestXtrans), s=1, mode = "fraction", type = "fit")
+head(ridgePred$fit)
+```
+
+```{r}
+ridgeRegFit <- train(solTrainXtrans, solTrainY, method = "ridge", tuneGrid = ridgeGrid, 
+                     # Fit the model over many penalty values 
+                     trControl = ctrl, preProc = c("center","scale"))
+ridgeRegFit
+```
+
+```{r}
+plot(ridgeRegFit)
+```
+
+```{r}
+enetModel <- enet(x = as.matrix(solTrainXtrans), y = solTrainY, lambda = 0.01, normalize = TRUE)
+```
+
+```{r}
+enetPred <- predict(enetModel, newx = as.matrix(solTestXtrans), s = .1, mode = "fraction", type = "fit")
+names(enetPred)
+```
+
+```{r}
+head(enetPred$fit)
+```
+
+```{r}
+enetCoef <- predict(enetModel, newx = as.matrix(solTestXTrans), s = .1, mode = "fraction", type = "coefficients")
+tail(enetCoef$coefficients)
+```
+
+```{r}
+enetGrid <- expand.grid(.lambda = c(0, 0.01, 0.1), .fraction = seq(0.05, 1, length = 20))
+set.seed(100)
+enetTune <- train(solTrainXtrans, solTrainY, method = "enet", tuneGrid = enetGrid, trControl = ctrl, preProc = c("center","scale"))
+```
+
+```{r}
+plot(enetTune)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
