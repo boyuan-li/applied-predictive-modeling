@@ -1,0 +1,78 @@
+---
+title: "Chapter 5"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+
+# Chapter 5. Measuring performance in regression models 
+
+
+## 5.1  Quantitative measures of performance
+```{r}
+# RMSE - Root Mean Squared Error: How far on average the residuals are from zero or as the average distance between the observed values and the model predictions
+
+# R2: Proportion of the information in the data that is explained by the model
+```
+
+## 5.2 The variance-bias trade-off
+```{r}
+# E[MSE] = irreducible noise + suqared bias + variance 
+```
+
+## 5.3 Computing 
+
+```{r}
+observed <- c(0.22, 0.83, -0.12, 0.89, -0.23, -1.30, -0.15, -1.4, 0.62, 0.99, -0.18, 0.32, 0.34, -0.30, 0.04, -0.87, 0.55, -1.30, -1.15, 0.20)
+predicted <- c(0.24, 0.78, -0.66, 0.53, 0.70, -0.75, -0.41, -0.43, 0.49, 0.79, -1.19, 0.06, 0.75, -0.07, 0.43, -0.42, -0.25, -0.64, -1.26, -0.07)
+residualValues <- observed - predicted 
+summary(residualValues)
+```
+
+```{r}
+axisRange <- extendrange(c(observed, predicted))
+plot(observed, predicted, ylim = axisRange, xlim = axisRange)
+abline(0, 1, col = "darkgrey", lty = 2)
+```
+
+```{r}
+plot(predicted, residualValues, ylab = "residual")
+abline(h = 0, col = "darkgrey", lty = 2)
+```
+
+```{r}
+caret::R2(predicted, observed)
+var(predicted, observed)
+caret::RMSE(predicted, observed)
+```
+
+```{r}
+cor(predicted, observed)
+cor(predicted, observed, method = "spearman")
+```
+
+
