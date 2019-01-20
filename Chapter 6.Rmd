@@ -1,0 +1,206 @@
+---
+title: "Chapter 6"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+
+
+
+
+# Chapter 6. Linear Regression and Its Cousins 
+```{r}
+# yi = b0 + b1xi1 + b2xi2 + ... + bpxip + ei
+# Linear in the parameters: ordinary linear regression, partial least squares (pls), penalized models (ridge regression, the lasso, the elastic net)
+```
+
+## 6.1 Case study: quantitative structure-activity relationship modeling
+
+## 6.2 Linear regression
+
+### Linear regression for solubility data
+
+## 6.3 Partial least squares 
+
+### PCR and PLSR for solubility data
+
+### Algorithmic variations of pls 
+
+## 6.4 Penalized models 
+
+## 6.5 Computing 
+
+```{r}
+library(AppliedPredictiveModeling)
+data(solubility)
+ls(pattern = "^solT")
+```
+
+```{r}
+set.seed(2)
+sample(names(solTrainX),8)
+```
+
+
+### Ordinary linear regression
+
+```{r}
+trainingData <- solTrainXtrans
+trainingData$Solubility <- solTrainY
+```
+
+```{r}
+lmFitAllPredictors <- lm(Solubility ~., data=trainingData)
+summary(lmFitAllPredictors)
+```
+
+```{r}
+lmPred1 <- predict(lmFitAllPredictors, solTestXtrans)
+head(lmPred1)
+```
+
+```{r}
+library(caret)
+lmValues1 <- data.frame(obs = solTestY, pred = lmPred1)
+defaultSummary(lmValues1)
+```
+
+```{r}
+library(MASS)
+rlmFitAllPredictors <- rlm(Solubility ~., data = trainingData)
+summary(rlmFitAllPredictors)
+```
+
+```{r}
+ctrl <- trainControl(method = "cv", number = 10)
+set.seed(100)
+lmFit1 <- train(x = solTrainXtrans, y = solTrainY, method = "lm", trControl = ctrl)
+lmFit1
+```
+
+```{r}
+xyplot(solTrainY ~predict(lmFit1), type = c("p","g"), xlab = "Predicdted", ylab = "Observed")
+```
+
+```{r}
+xyplot(resid(lmFit1) ~ predict(lmFit1), type = c("p","g"), xlab = "Predicted", ylab = "Residuals")
+```
+
+```{r}
+corThresh <- .9
+tooHigh <- findCorrelation(cor(solTrainXtrans),corThresh)
+corrPred <- names(solTrainXtrans)[tooHigh]
+trainXfiltered <- solTrainXtrans[,-tooHigh]
+testXfiltered <- solTestXtrans[,-tooHigh]
+set.seed(100)
+lmFiltered <- train(solTrainXtrans, solTrainY, method = "lm", trControl = ctrl)
+lmFiltered
+```
+
+```{r}
+set.seed(100)
+rlmPCA <- train(solTrainXtrans, solTrainY, method = "rlm", preProcess = "pca", trControl = ctrl)
+rlmPCA
+```
+
+
+### Partial least squares 
+
+```{r}
+library(pls)
+plsFit <- plsr(Solubility ~., data = trainingData)
+summary(plsFit)
+```
+
+```{r}
+predict(plsFit, solTestXtrans[1:5,], ncomp = 1:2)
+```
+
+```{r}
+set.seed(100)
+plsTune <- train(solTrainXtrans, solTrainY, method = "pls", tuneLength = 20, 
+                  # The default tuning grid evaluates components 1 ... tuneLength)
+                 trControl = ctrl, preProc = c("center","scale"))
+plsTune
+```
+
+```{r}
+plot(plsTune)
+```
+
+
+### Penalized regression models 
+
+```{r}
+library(elasticnet)
+ridgeModel <- enet(x = as.matrix(solTrainXtrans), y = solTrainY, lambda = 0.001)
+plot(ridgeModel)
+```
+```{r}
+ridgePred <- predict(ridgeModel, newx = as.matrix(solTestXtrans), s=1, mode = "fraction", type = "fit")
+head(ridgePred$fit)
+```
+
+```{r}
+ridgeRegFit <- train(solTrainXtrans, solTrainY, method = "ridge", tuneGrid = ridgeGrid, 
+                     # Fit the model over many penalty values 
+                     trControl = ctrl, preProc = c("center","scale"))
+ridgeRegFit
+```
+
+```{r}
+plot(ridgeRegFit)
+```
+
+```{r}
+enetModel <- enet(x = as.matrix(solTrainXtrans), y = solTrainY, lambda = 0.01, normalize = TRUE)
+```
+
+```{r}
+enetPred <- predict(enetModel, newx = as.matrix(solTestXtrans), s = .1, mode = "fraction", type = "fit")
+names(enetPred)
+```
+
+```{r}
+head(enetPred$fit)
+```
+
+```{r}
+enetCoef <- predict(enetModel, newx = as.matrix(solTestXTrans), s = .1, mode = "fraction", type = "coefficients")
+tail(enetCoef$coefficients)
+```
+
+```{r}
+enetGrid <- expand.grid(.lambda = c(0, 0.01, 0.1), .fraction = seq(0.05, 1, length = 20))
+set.seed(100)
+enetTune <- train(solTrainXtrans, solTrainY, method = "enet", tuneGrid = enetGrid, trControl = ctrl, preProc = c("center","scale"))
+```
+
+```{r}
+plot(enetTune)
+```
+
