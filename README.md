@@ -28,3 +28,6 @@ prediction accuracy on future, yet-to-be-seen data. The entire process is the fo
 18. Measuring Predictor Importance 
 19. An Introduction to Feature Selection 
 20. Factors That Can Affect Model Performance 
+
+
+20181201 First view
